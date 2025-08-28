@@ -108,6 +108,18 @@ st.markdown("""
     hr {
         background-color: #E0E0E0 !important;
     }
+    
+    /* Center and enlarge checkboxes */
+    [data-testid="stCheckbox"] {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        margin-top: -10px; /* Adjust vertical alignment */
+    }
+    [data-testid="stCheckbox"] input {
+        transform: scale(1.5);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -132,7 +144,7 @@ if st.session_state.hall_data:
         search_input = st.text_input(
             "Search Directory",
             value=st.session_state.search_query,
-            placeholder="Search by name, department, hall, etc. and press Enter...",
+            placeholder="Search by name, department, hall, etc.",
             key="search_box",
             label_visibility="collapsed"
         )
