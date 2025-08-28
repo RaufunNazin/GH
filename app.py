@@ -73,8 +73,8 @@ def save_contact_status():
 # Set page configuration for a better layout
 st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 
-st.title("Girls' Hall Contact Directory")
-st.markdown("A simple app to search and manage contacts.")
+st.title("Girls' Hall Contact Manager")
+st.markdown("Search, view, and update contact information for the Girls' Hall directory.")
 
 # Initialize session state variables
 if 'hall_data' not in st.session_state:
@@ -88,18 +88,23 @@ if 'search_query' not in st.session_state:
 # Main app logic starts here
 if st.session_state.hall_data:
     # --- Search UI ---
-    search_input = st.text_input(
-        "Search by any field",
-        value=st.session_state.search_query,
-        placeholder="Type to search and press Enter...",
-        key="search_box"
-    )
+    search_col1, search_col2 = st.columns([4, 1])
+    with search_col1:
+        search_input = st.text_input(
+            "Search Directory",
+            value=st.session_state.search_query,
+            placeholder="Search by name, department, hall, etc. and press Enter...",
+            key="search_box",
+            label_visibility="collapsed"
+        )
+    with search_col2:
+        search_button = st.button("Search", use_container_width=True)
     
-    # Check for search changes
-    if search_input != st.session_state.search_query:
+    # Check for search changes from button or Enter key
+    if search_button or (search_input != st.session_state.search_query):
         st.session_state.search_query = search_input
         st.session_state.page_number = 0 # Reset page number on new search
-        st.toast("Searching...")
+        st.toast("Applying search...")
         time.sleep(0.5) # Give user time to see the toast
         st.rerun()
 
