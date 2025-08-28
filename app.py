@@ -73,6 +73,25 @@ def save_contact_status():
 # Set page configuration for a better layout
 st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 
+# Custom CSS for a white-based theme
+st.markdown("""
+<style>
+    .main {
+        background-color: #FFFFFF;
+    }
+    body, .stApp {
+        color: #000000;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        color: #000000 !important;
+    }
+    .st-emotion-cache-16txtl3 {
+        color: #000000;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
 st.title("Girls' Hall Contact Manager")
 st.markdown("Search, view, and update contact information for the Girls' Hall directory.")
 
