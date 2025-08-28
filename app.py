@@ -84,36 +84,21 @@ if 'page_number' not in st.session_state:
     st.session_state.page_number = 0
 if 'search_query' not in st.session_state:
     st.session_state.search_query = ""
-if 'selected_hall' not in st.session_state:
-    st.session_state.selected_hall = "All Halls"
-
 
 # Main app logic starts here
 if st.session_state.hall_data:
-    # --- Search and Filter UI ---
-    col1, col2 = st.columns([3, 1])
-
-    with col1:
-        search_input = st.text_input(
-            "Search by any field",
-            value=st.session_state.search_query,
-            placeholder="Type to search and press Enter...",
-            key="search_box"
-        )
-
-    with col2:
-        hall_names = ["All Halls"] + sorted(list(set(d['Hall Name'] for d in st.session_state.hall_data)))
-        selected_hall_input = st.selectbox(
-            "Filter by Hall",
-            options=hall_names,
-            key="hall_filter"
-        )
+    # --- Search UI ---
+    search_input = st.text_input(
+        "Search by any field",
+        value=st.session_state.search_query,
+        placeholder="Type to search and press Enter...",
+        key="search_box"
+    )
     
     # Check for search changes
-    if (search_input != st.session_state.search_query) or (selected_hall_input != st.session_state.selected_hall):
+    if search_input != st.session_state.search_query:
         st.session_state.search_query = search_input
-        st.session_state.selected_hall = selected_hall_input
-        st.session_state.page_number = 0 # Reset page number on new search/filter
+        st.session_state.page_number = 0 # Reset page number on new search
         st.toast("Searching...")
         time.sleep(0.5) # Give user time to see the toast
         st.rerun()
@@ -121,13 +106,6 @@ if st.session_state.hall_data:
     # --- Data Filtering Logic ---
     filtered_data = st.session_state.hall_data
     
-    # Filter by selected hall
-    if st.session_state.selected_hall != "All Halls":
-        filtered_data = [
-            record for record in filtered_data
-            if record.get('Hall Name') == st.session_state.selected_hall
-        ]
-
     # Filter by search query
     if st.session_state.search_query:
         query = st.session_state.search_query.strip().lower()
@@ -150,41 +128,44 @@ if st.session_state.hall_data:
     if not paginated_data:
         st.warning("No records found matching your criteria.")
     else:
-        # Create header columns
+        # Create fixed header columns
         cols = st.columns([2, 2, 2, 1])
         headers = ['Name', 'Department / Hall', 'Contact Info', 'Contacted']
         for col, header in zip(cols, headers):
             col.markdown(f"**{header}**")
+        st.markdown("---")
 
-        # Display each record
-        for i, record in enumerate(paginated_data, start=start_idx):
-            record_id = get_record_id(record)
-            
-            col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-
-            with col1:
-                st.markdown(f"**{record.get('Name', 'N/A')}**")
-                st.caption(f"Year: {record.get('Year', 'N/A')}")
-            
-            with col2:
-                st.markdown(f"**{record.get('Department', 'N/A')}**")
-                st.caption(f"Hall: {record.get('Hall Name', 'N/A')}")
-            
-            with col3:
-                st.markdown(f"**Email:** {record.get('Email', 'N/A')}")
-                st.caption(f"Phone: {record.get('Contact', 'N/A')}")
-
-            with col4:
-                is_contacted = st.session_state.contact_status.get(record_id, False)
-                unique_key = f"checkbox_{record_id}_{i}"
-                new_status = st.checkbox(" ", value=is_contacted, key=unique_key, label_visibility="collapsed")
+        # Create a scrollable container for the data rows
+        with st.container(height=600):
+            # Display each record
+            for i, record in enumerate(paginated_data, start=start_idx):
+                record_id = get_record_id(record)
                 
-                if new_status != is_contacted:
-                    st.session_state.contact_status[record_id] = new_status
-                    save_contact_status()
-                    st.rerun()
-            
-            st.markdown("---")
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+
+                with col1:
+                    st.markdown(f"**{record.get('Name', 'N/A')}**")
+                    st.caption(f"Year: {record.get('Year', 'N/A')}")
+                
+                with col2:
+                    st.markdown(f"**{record.get('Department', 'N/A')}**")
+                    st.caption(f"Hall: {record.get('Hall Name', 'N/A')}")
+                
+                with col3:
+                    st.markdown(f"**Email:** {record.get('Email', 'N/A')}")
+                    st.caption(f"Phone: {record.get('Contact', 'N/A')}")
+
+                with col4:
+                    is_contacted = st.session_state.contact_status.get(record_id, False)
+                    unique_key = f"checkbox_{record_id}_{i}"
+                    new_status = st.checkbox(" ", value=is_contacted, key=unique_key, label_visibility="collapsed")
+                    
+                    if new_status != is_contacted:
+                        st.session_state.contact_status[record_id] = new_status
+                        save_contact_status()
+                        st.rerun()
+                
+                st.markdown("---")
 
     # --- Pagination Controls ---
     if total_pages > 1:
