@@ -1,298 +1,236 @@
-/* Custom styles for the Girls' Hall Search Portal */
+import streamlit as st
+import pandas as pd
+import json
+import os
+import time
 
-:root {
-    --primary-color: #2c3e50;
-    --secondary-color: #3498db;
-    --accent-color: #e74c3c;
-    --success-color: #27ae60;
-    --warning-color: #f39c12;
-    --light-bg: #f8f9fa;
-    --border-color: #dee2e6;
-    --text-muted: #6c757d;
-}
+# --- Configuration ---
+EXCEL_FILE = "Emails Latest (1).xlsx"
+STATUS_FILE = 'contact_status.json'
+RECORDS_PER_PAGE = 25 # Number of records to display per page
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: var(--light-bg);
-    line-height: 1.6;
-}
+# --- Helper Functions ---
 
-/* Header Styles */
-header {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
+def get_record_id(record):
+    """Generate a unique ID for a record based on key fields to prevent collisions."""
+    # Using a tuple of sorted items makes the ID independent of column order
+    key_items = sorted([str(v) for k, v in record.items() if k in ['Name', 'Contact', 'Email']])
+    return "_".join(key_items)
 
-header h1 {
-    font-weight: 600;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
+# --- Data Loading and Caching ---
 
-/* Search Container */
-.search-container {
-    position: relative;
-    margin-bottom: 2rem;
-}
+@st.cache_data
+def load_excel_data():
+    """Load data from Excel file, clean it, and return as a list of dictionaries."""
+    try:
+        if not os.path.exists(EXCEL_FILE):
+            st.error(f"Error: The data file '{EXCEL_FILE}' was not found.")
+            return None
 
-.search-container .input-group {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    border-radius: 10px;
-    overflow: hidden;
-}
+        df = pd.read_excel(EXCEL_FILE)
+        
+        # Define the fields to keep for a clean dataset
+        fields_to_keep = ['Contact', 'Department', 'Email', 'Hall Name', 'Name', 'Year']
+        
+        # Filter columns to only what's needed
+        available_fields = [col for col in fields_to_keep if col in df.columns]
+        df = df[available_fields]
 
-.search-container .form-control {
-    border: none;
-    padding: 1rem 1.5rem;
-    font-size: 1.1rem;
-    background: white;
-}
+        # Convert all columns to string to avoid serialization issues with JSON/Streamlit
+        for col in df.columns:
+            df[col] = df[col].astype(str).replace('nan', 'N/A')
+        
+        # Convert to list of dictionaries
+        return df.to_dict('records')
 
-.search-container .form-control:focus {
-    box-shadow: none;
-    border-color: transparent;
-}
+    except Exception as e:
+        st.error(f"An error occurred while loading the Excel file: {e}")
+        return None
 
-.search-container .btn {
-    padding: 1rem 2rem;
-    font-weight: 600;
-    border-radius: 0;
-}
+def load_contact_status():
+    """Load contact status from the JSON file into the session state."""
+    if 'contact_status' not in st.session_state:
+        try:
+            if os.path.exists(STATUS_FILE):
+                with open(STATUS_FILE, 'r', encoding='utf-8') as f:
+                    st.session_state.contact_status = json.load(f)
+            else:
+                st.session_state.contact_status = {}
+        except Exception as e:
+            st.warning(f"Could not load contact status file: {e}")
+            st.session_state.contact_status = {}
 
-/* Search Suggestions */
-.search-suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white;
-    border: 1px solid var(--border-color);
-    border-top: none;
-    border-radius: 0 0 10px 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    z-index: 1000;
-    max-height: 300px;
-    overflow-y: auto;
-    display: none;
-}
+def save_contact_status():
+    """Save the current contact status from the session state to the JSON file."""
+    try:
+        with open(STATUS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.contact_status, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.error(f"Failed to save contact status: {e}")
 
-.suggestion-item {
-    padding: 0.75rem 1.5rem;
-    cursor: pointer;
-    border-bottom: 1px solid #f1f1f1;
-    transition: background-color 0.2s;
-}
+# --- Streamlit App UI ---
 
-.suggestion-item:hover {
-    background-color: #f8f9fa;
-}
+# Set page configuration for a better layout
+st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 
-.suggestion-item:last-child {
-    border-bottom: none;
-}
+# Custom CSS to enforce a clean, white-based theme
+st.markdown("""
+<style>
+    /* Main app background */
+    .main, .stApp {
+        background-color: #FFFFFF !important;
+        color: #000000;
+    }
 
-/* Results Cards */
-.result-card {
-    background: white;
-    border: none;
-    border-radius: 15px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-    margin-bottom: 1.5rem;
-    transition: transform 0.2s, box-shadow 0.2s;
-    overflow: hidden;
-}
-
-.result-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-}
-
-.result-card .card-header {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1rem 1.5rem;
-}
-
-.result-card .card-body {
-    padding: 1.5rem;
-}
-
-/* Field Display */
-.field-item {
-    display: flex;
-    margin-bottom: 0.75rem;
-    align-items: flex-start;
-}
-
-.field-label {
-    font-weight: 600;
-    color: var(--primary-color);
-    min-width: 150px;
-    margin-right: 1rem;
-    flex-shrink: 0;
-}
-
-.field-value {
-    color: #333;
-    flex: 1;
-    word-break: break-word;
-}
-
-/* Bengali Text Support */
-.bengali-text {
-    font-family: 'Noto Sans Bengali', 'SolaimanLipi', 'Kalpurush', sans-serif;
-    direction: ltr;
-    text-align: left;
-}
-
-/* Language Toggle */
-.language-toggle .btn {
-    border-radius: 20px;
-    padding: 0.5rem 1rem;
-    font-weight: 500;
-}
-
-/* Loading Spinner */
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
-}
-
-/* Modal Styles */
-.modal-content {
-    border: none;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-}
-
-.modal-header {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-    color: white;
-    border-radius: 15px 15px 0 0;
-    border-bottom: none;
-}
-
-.modal-header .btn-close {
-    filter: invert(1);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .search-container .input-group {
-        flex-direction: column;
+    /* All text elements */
+    body, h1, h2, h3, h4, h5, h6, p, .stMarkdown, .st-emotion-cache-16txtl3 {
+        color: #000000 !important;
     }
     
-    .search-container .btn {
-        border-radius: 0 0 10px 10px;
-        margin-top: -1px;
+    /* Input fields */
+    .stTextInput input {
+        background-color: #F0F2F6 !important;
+        color: #000000 !important;
     }
     
-    .field-item {
-        flex-direction: column;
+    /* Buttons */
+    .stButton>button {
+        background-color: #F0F2F6;
+        color: #000000;
+        border: 1px solid #D0D0D0;
     }
+    .stButton>button:hover {
+        background-color: #E0E0E0;
+        color: #000000;
+        border: 1px solid #C0C0C0;
+    }
+
+    /* Separator lines */
+    hr {
+        background-color: #E0E0E0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+st.title("Girls' Hall Contact Manager")
+st.markdown("Search, view, and update contact information for the Girls' Hall directory.")
+
+# Initialize session state variables
+if 'hall_data' not in st.session_state:
+    st.session_state.hall_data = load_excel_data()
+    load_contact_status()
+if 'page_number' not in st.session_state:
+    st.session_state.page_number = 0
+if 'search_query' not in st.session_state:
+    st.session_state.search_query = ""
+
+# Main app logic starts here
+if st.session_state.hall_data:
+    # --- Search UI ---
+    search_col1, search_col2 = st.columns([4, 1])
+    with search_col1:
+        search_input = st.text_input(
+            "Search Directory",
+            value=st.session_state.search_query,
+            placeholder="Search by name, department, hall, etc. and press Enter...",
+            key="search_box",
+            label_visibility="collapsed"
+        )
+    with search_col2:
+        search_button = st.button("Search", use_container_width=True)
     
-    .field-label {
-        min-width: auto;
-        margin-bottom: 0.25rem;
-        margin-right: 0;
-    }
+    # Check for search changes from button or Enter key
+    if search_button or (search_input != st.session_state.search_query):
+        st.session_state.search_query = search_input
+        st.session_state.page_number = 0 # Reset page number on new search
+        st.toast("Applying search...")
+        time.sleep(0.5) # Give user time to see the toast
+        st.rerun()
+
+    # --- Data Filtering Logic ---
+    filtered_data = st.session_state.hall_data
     
-    header h1 {
-        font-size: 1.5rem;
-    }
-}
+    # Filter by search query
+    if st.session_state.search_query:
+        query = st.session_state.search_query.strip().lower()
+        filtered_data = [
+            record for record in filtered_data
+            if any(query in str(value).lower() for value in record.values())
+        ]
 
-/* Animation Classes */
-.fade-in {
-    animation: fadeIn 0.5s ease-in;
-}
+    # --- Pagination Logic ---
+    total_records = len(filtered_data)
+    total_pages = (total_records // RECORDS_PER_PAGE) + (1 if total_records % RECORDS_PER_PAGE > 0 else 0)
+    start_idx = st.session_state.page_number * RECORDS_PER_PAGE
+    end_idx = min(start_idx + RECORDS_PER_PAGE, total_records)
+    
+    paginated_data = filtered_data[start_idx:end_idx]
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+    # --- Display Results ---
+    st.write(f"Displaying records {start_idx + 1}-{end_idx} of {total_records}.")
 
-.slide-in {
-    animation: slideIn 0.3s ease-out;
-}
+    if not paginated_data:
+        st.warning("No records found matching your criteria.")
+    else:
+        # Create fixed header columns
+        cols = st.columns([2, 2, 2, 1])
+        headers = ['Name', 'Department / Hall', 'Contact Info', 'Contacted']
+        for col, header in zip(cols, headers):
+            col.markdown(f"**{header}**")
+        st.markdown("---")
 
-@keyframes slideIn {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(0); }
-}
+        # Create a scrollable container for the data rows
+        with st.container(height=600):
+            # Display each record
+            for i, record in enumerate(paginated_data, start=start_idx):
+                record_id = get_record_id(record)
+                
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
 
-/* Utility Classes */
-.text-truncate-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
+                with col1:
+                    st.markdown(f"**{record.get('Name', 'N/A')}**")
+                    st.caption(f"Year: {record.get('Year', 'N/A')}")
+                
+                with col2:
+                    st.markdown(f"**{record.get('Department', 'N/A')}**")
+                    st.caption(f"Hall: {record.get('Hall Name', 'N/A')}")
+                
+                with col3:
+                    st.markdown(f"**Email:** {record.get('Email', 'N/A')}")
+                    st.caption(f"Phone: {record.get('Contact', 'N/A')}")
 
-.bg-gradient-primary {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-}
+                with col4:
+                    is_contacted = st.session_state.contact_status.get(record_id, False)
+                    unique_key = f"checkbox_{record_id}_{i}"
+                    new_status = st.checkbox(" ", value=is_contacted, key=unique_key, label_visibility="collapsed")
+                    
+                    if new_status != is_contacted:
+                        st.session_state.contact_status[record_id] = new_status
+                        save_contact_status()
+                        st.rerun()
+                
+                st.markdown("---")
 
-/* Contact Tracking Styles */
-.contact-tracking {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-}
+    # --- Pagination Controls ---
+    if total_pages > 1:
+        st.markdown("---")
+        nav_cols = st.columns([1, 1, 1])
+        
+        with nav_cols[0]:
+            if st.session_state.page_number > 0:
+                if st.button("⬅️ Previous"):
+                    st.session_state.page_number -= 1
+                    st.rerun()
+        
+        with nav_cols[1]:
+            st.write(f"Page {st.session_state.page_number + 1} of {total_pages}")
+            
+        with nav_cols[2]:
+            if st.session_state.page_number < total_pages - 1:
+                if st.button("Next ➡️"):
+                    st.session_state.page_number += 1
+                    st.rerun()
 
-.contact-status-text {
-    font-weight: 500;
-    color: var(--primary-color);
-}
-
-.status-badge {
-    font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-}
-
-.contact-tracking .btn-group .btn {
-    font-size: 0.875rem;
-    padding: 0.375rem 0.75rem;
-}
-
-.contact-tracking .btn-success {
-    background-color: var(--success-color);
-    border-color: var(--success-color);
-}
-
-.contact-tracking .btn-warning {
-    background-color: var(--warning-color);
-    border-color: var(--warning-color);
-    color: white;
-}
-
-.contact-tracking .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Success notification styles */
-.alert-success {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--secondary-color);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-color);
-}
+else:
+    st.info("Waiting for data to be loaded. If this message persists, please check the application logs.")
