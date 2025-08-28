@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import time
 
 # --- Configuration ---
 EXCEL_FILE = "Emails Latest (1).xlsx"
@@ -75,36 +76,67 @@ st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 st.title("Girls' Hall Contact Directory")
 st.markdown("A simple app to search and manage contacts.")
 
-# Initialize session state variables for data and pagination
+# Initialize session state variables
 if 'hall_data' not in st.session_state:
     st.session_state.hall_data = load_excel_data()
     load_contact_status()
 if 'page_number' not in st.session_state:
     st.session_state.page_number = 0
+if 'search_query' not in st.session_state:
+    st.session_state.search_query = ""
+if 'selected_hall' not in st.session_state:
+    st.session_state.selected_hall = "All Halls"
+
 
 # Main app logic starts here
 if st.session_state.hall_data:
-    # Create a search bar
-    search_query = st.text_input("Search by any field (Name, Department, Hall, etc.)", placeholder="Type here to search...")
+    # --- Search and Filter UI ---
+    col1, col2 = st.columns([3, 1])
 
-    # Filter data based on the search query
-    if search_query:
-        query = search_query.strip().lower()
+    with col1:
+        search_input = st.text_input(
+            "Search by any field",
+            value=st.session_state.search_query,
+            placeholder="Type to search and press Enter...",
+            key="search_box"
+        )
+
+    with col2:
+        hall_names = ["All Halls"] + sorted(list(set(d['Hall Name'] for d in st.session_state.hall_data)))
+        selected_hall_input = st.selectbox(
+            "Filter by Hall",
+            options=hall_names,
+            key="hall_filter"
+        )
+    
+    # Check for search changes
+    if (search_input != st.session_state.search_query) or (selected_hall_input != st.session_state.selected_hall):
+        st.session_state.search_query = search_input
+        st.session_state.selected_hall = selected_hall_input
+        st.session_state.page_number = 0 # Reset page number on new search/filter
+        st.toast("Searching...")
+        time.sleep(0.5) # Give user time to see the toast
+        st.rerun()
+
+    # --- Data Filtering Logic ---
+    filtered_data = st.session_state.hall_data
+    
+    # Filter by selected hall
+    if st.session_state.selected_hall != "All Halls":
         filtered_data = [
-            record for record in st.session_state.hall_data
+            record for record in filtered_data
+            if record.get('Hall Name') == st.session_state.selected_hall
+        ]
+
+    # Filter by search query
+    if st.session_state.search_query:
+        query = st.session_state.search_query.strip().lower()
+        filtered_data = [
+            record for record in filtered_data
             if any(query in str(value).lower() for value in record.values())
         ]
-        # Reset to first page on new search
-        if 'last_query' not in st.session_state or st.session_state.last_query != query:
-            st.session_state.page_number = 0
-            st.session_state.last_query = query
-    else:
-        filtered_data = st.session_state.hall_data
-        if 'last_query' in st.session_state:
-            del st.session_state['last_query']
 
-
-    # Pagination Logic
+    # --- Pagination Logic ---
     total_records = len(filtered_data)
     total_pages = (total_records // RECORDS_PER_PAGE) + (1 if total_records % RECORDS_PER_PAGE > 0 else 0)
     start_idx = st.session_state.page_number * RECORDS_PER_PAGE
@@ -112,19 +144,19 @@ if st.session_state.hall_data:
     
     paginated_data = filtered_data[start_idx:end_idx]
 
-    # Display the count of results
+    # --- Display Results ---
     st.write(f"Displaying records {start_idx + 1}-{end_idx} of {total_records}.")
 
     if not paginated_data:
-        st.warning("No records found matching your search criteria.")
+        st.warning("No records found matching your criteria.")
     else:
-        # Create header columns for a clean layout
-        cols = st.columns([2, 2, 2, 1]) # Adjust column widths as needed
+        # Create header columns
+        cols = st.columns([2, 2, 2, 1])
         headers = ['Name', 'Department / Hall', 'Contact Info', 'Contacted']
         for col, header in zip(cols, headers):
             col.markdown(f"**{header}**")
 
-        # Display each record in its own row
+        # Display each record
         for i, record in enumerate(paginated_data, start=start_idx):
             record_id = get_record_id(record)
             
@@ -143,20 +175,16 @@ if st.session_state.hall_data:
                 st.caption(f"Phone: {record.get('Contact', 'N/A')}")
 
             with col4:
-                # Get the current status from session state
                 is_contacted = st.session_state.contact_status.get(record_id, False)
-                
-                # Create a checkbox with a guaranteed unique key by including the index
                 unique_key = f"checkbox_{record_id}_{i}"
                 new_status = st.checkbox(" ", value=is_contacted, key=unique_key, label_visibility="collapsed")
                 
-                # If the checkbox state is changed by the user, update the session state and save
                 if new_status != is_contacted:
                     st.session_state.contact_status[record_id] = new_status
                     save_contact_status()
-                    st.rerun() # Rerun the script to immediately reflect the change
+                    st.rerun()
             
-            st.markdown("---") # Add a visual separator between records
+            st.markdown("---")
 
     # --- Pagination Controls ---
     if total_pages > 1:
