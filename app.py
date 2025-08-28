@@ -109,6 +109,11 @@ st.markdown("""
         background-color: #E0E0E0;
         border: 1px solid #C0C0C0;
     }
+    .stButton>button:disabled {
+        background-color: #F0F2F6;
+        color: #A0A0A0;
+        border: 1px solid #E0E0E0;
+    }
 
     /* Style separator lines */
     hr {
@@ -124,21 +129,18 @@ st.markdown("""
         margin-top: -10px; /* Adjust vertical alignment */
     }
     [data-testid="stCheckbox"] input {
-        /* Reset default appearance */
         -webkit-appearance: none;
         appearance: none;
-        /* Set custom style */
-        background-color: #FFFFFF;
-        border: 1px solid #D0D0D0;
+        background-color: #FFFFFF; !important;
+        border: 1px solid #D0D0D0; !important;
         width: 20px;
         height: 20px;
         border-radius: 4px;
         position: relative;
         cursor: pointer;
     }
-    /* Style for the checkmark when checked */
     [data-testid="stCheckbox"] input:checked {
-        background-color: #F0F2F6;
+        background-color: #E0E0E0;
         border-color: #000000;
     }
     [data-testid="stCheckbox"] input:checked::after {
@@ -256,22 +258,22 @@ if st.session_state.hall_data:
     # --- Pagination Controls ---
     if total_pages > 1:
         st.markdown("---")
-        nav_cols = st.columns([1, 1, 1])
         
-        with nav_cols[0]:
-            if st.session_state.page_number > 0:
-                if st.button("⬅️ Previous"):
-                    st.session_state.page_number -= 1
-                    st.rerun()
+        # Use columns to center the pagination controls
+        _, prev_col, page_col, next_col, _ = st.columns([3, 2, 2, 2, 3])
+
+        with prev_col:
+            if st.button("⬅️ Previous", use_container_width=True, disabled=(st.session_state.page_number == 0)):
+                st.session_state.page_number -= 1
+                st.rerun()
         
-        with nav_cols[1]:
-            st.write(f"Page {st.session_state.page_number + 1} of {total_pages}")
+        with page_col:
+            st.markdown(f"<div style='text-align: center; margin-top: 5px;'>Page {st.session_state.page_number + 1} of {total_pages}</div>", unsafe_allow_html=True)
             
-        with nav_cols[2]:
-            if st.session_state.page_number < total_pages - 1:
-                if st.button("Next ➡️"):
-                    st.session_state.page_number += 1
-                    st.rerun()
+        with next_col:
+            if st.button("Next ➡️", use_container_width=True, disabled=(st.session_state.page_number >= total_pages - 1)):
+                st.session_state.page_number += 1
+                st.rerun()
 
 else:
     st.info("Waiting for data to be loaded. If this message persists, please check the application logs.")
