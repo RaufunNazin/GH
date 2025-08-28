@@ -76,24 +76,24 @@ st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 # Custom CSS to enforce a clean, white-based theme
 st.markdown("""
 <style>
-    /* Main app background */
-    .main, .stApp {
+    /* Force white background on the main app container */
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #FFFFFF !important;
-        color: #000000;
     }
 
-    /* All text elements */
-    body, h1, h2, h3, h4, h5, h6, p, .stMarkdown, .st-emotion-cache-16txtl3 {
+    /* Ensure all text is black for readability */
+    body, .stApp, h1, h2, h3, h4, h5, h6, .stMarkdown, p, .st-emotion-cache-16txtl3, .st-emotion-cache-1jicfl2, .st-emotion-cache-1d9230i {
         color: #000000 !important;
     }
     
-    /* Input fields */
+    /* Style input fields for the light theme */
     .stTextInput input {
         background-color: #F0F2F6 !important;
         color: #000000 !important;
+        border: 1px solid #D0D0D0 !important;
     }
     
-    /* Buttons */
+    /* Style buttons for the light theme */
     .stButton>button {
         background-color: #F0F2F6;
         color: #000000;
@@ -101,11 +101,10 @@ st.markdown("""
     }
     .stButton>button:hover {
         background-color: #E0E0E0;
-        color: #000000;
         border: 1px solid #C0C0C0;
     }
 
-    /* Separator lines */
+    /* Style separator lines */
     hr {
         background-color: #E0E0E0 !important;
     }
