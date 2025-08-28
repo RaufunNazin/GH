@@ -115,7 +115,7 @@ st.markdown("""
         background-color: #E0E0E0 !important;
     }
     
-    /* Center and enlarge checkboxes */
+    /* Center and style checkboxes */
     [data-testid="stCheckbox"] {
         display: flex;
         justify-content: center;
@@ -124,8 +124,31 @@ st.markdown("""
         margin-top: -10px; /* Adjust vertical alignment */
     }
     [data-testid="stCheckbox"] input {
-        transform: scale(1.5);
-        accent-color: #000000; /* Make the checkmark black */
+        /* Reset default appearance */
+        -webkit-appearance: none;
+        appearance: none;
+        /* Set custom style */
+        background-color: #FFFFFF;
+        border: 1px solid #D0D0D0;
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        position: relative;
+        cursor: pointer;
+    }
+    /* Style for the checkmark when checked */
+    [data-testid="stCheckbox"] input:checked {
+        background-color: #F0F2F6;
+        border-color: #000000;
+    }
+    [data-testid="stCheckbox"] input:checked::after {
+        content: '✔';
+        font-size: 16px;
+        color: #000000;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
     }
 </style>
 """, unsafe_allow_html=True)
