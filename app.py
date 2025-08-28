@@ -6,6 +6,7 @@ import os
 # --- Configuration ---
 EXCEL_FILE = "Emails Latest (1).xlsx"
 STATUS_FILE = 'contact_status.json'
+RECORDS_PER_PAGE = 25 # Number of records to display per page
 
 # --- Helper Functions ---
 
@@ -74,10 +75,12 @@ st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 st.title("Girls' Hall Contact Directory")
 st.markdown("A simple app to search and manage contacts.")
 
-# Load data into session state once to persist across reruns
+# Initialize session state variables for data and pagination
 if 'hall_data' not in st.session_state:
     st.session_state.hall_data = load_excel_data()
     load_contact_status()
+if 'page_number' not in st.session_state:
+    st.session_state.page_number = 0
 
 # Main app logic starts here
 if st.session_state.hall_data:
@@ -91,13 +94,28 @@ if st.session_state.hall_data:
             record for record in st.session_state.hall_data
             if any(query in str(value).lower() for value in record.values())
         ]
+        # Reset to first page on new search
+        if 'last_query' not in st.session_state or st.session_state.last_query != query:
+            st.session_state.page_number = 0
+            st.session_state.last_query = query
     else:
         filtered_data = st.session_state.hall_data
+        if 'last_query' in st.session_state:
+            del st.session_state['last_query']
+
+
+    # Pagination Logic
+    total_records = len(filtered_data)
+    total_pages = (total_records // RECORDS_PER_PAGE) + (1 if total_records % RECORDS_PER_PAGE > 0 else 0)
+    start_idx = st.session_state.page_number * RECORDS_PER_PAGE
+    end_idx = min(start_idx + RECORDS_PER_PAGE, total_records)
+    
+    paginated_data = filtered_data[start_idx:end_idx]
 
     # Display the count of results
-    st.write(f"Displaying {len(filtered_data)} of {len(st.session_state.hall_data)} records.")
+    st.write(f"Displaying records {start_idx + 1}-{end_idx} of {total_records}.")
 
-    if not filtered_data:
+    if not paginated_data:
         st.warning("No records found matching your search criteria.")
     else:
         # Create header columns for a clean layout
@@ -107,7 +125,7 @@ if st.session_state.hall_data:
             col.markdown(f"**{header}**")
 
         # Display each record in its own row
-        for i, record in enumerate(filtered_data):
+        for i, record in enumerate(paginated_data, start=start_idx):
             record_id = get_record_id(record)
             
             col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
@@ -139,5 +157,26 @@ if st.session_state.hall_data:
                     st.rerun() # Rerun the script to immediately reflect the change
             
             st.markdown("---") # Add a visual separator between records
+
+    # --- Pagination Controls ---
+    if total_pages > 1:
+        st.markdown("---")
+        nav_cols = st.columns([1, 1, 1])
+        
+        with nav_cols[0]:
+            if st.session_state.page_number > 0:
+                if st.button("⬅️ Previous"):
+                    st.session_state.page_number -= 1
+                    st.rerun()
+        
+        with nav_cols[1]:
+            st.write(f"Page {st.session_state.page_number + 1} of {total_pages}")
+            
+        with nav_cols[2]:
+            if st.session_state.page_number < total_pages - 1:
+                if st.button("Next ➡️"):
+                    st.session_state.page_number += 1
+                    st.rerun()
+
 else:
     st.info("Waiting for data to be loaded. If this message persists, please check the application logs.")
