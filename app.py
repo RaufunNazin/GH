@@ -6,18 +6,23 @@ import time
 
 # --- Configuration ---
 EXCEL_FILE = "Emails Latest (1).xlsx"
-STATUS_FILE = 'contact_status.json'
-RECORDS_PER_PAGE = 25 # Number of records to display per page
+STATUS_FILE = "contact_status.json"
+RECORDS_PER_PAGE = 25  # Number of records to display per page
 
 # --- Helper Functions ---
+
 
 def get_record_id(record):
     """Generate a unique ID for a record based on key fields to prevent collisions."""
     # Using a tuple of sorted items makes the ID independent of column order
-    key_items = sorted([str(v) for k, v in record.items() if k in ['Name', 'Contact', 'Email']])
+    key_items = sorted(
+        [str(v) for k, v in record.items() if k in ["Name", "Contact", "Email"]]
+    )
     return "_".join(key_items)
 
+
 # --- Data Loading and Caching ---
+
 
 @st.cache_data
 def load_excel_data():
@@ -28,31 +33,32 @@ def load_excel_data():
             return None
 
         df = pd.read_excel(EXCEL_FILE)
-        
+
         # Define the fields to keep for a clean dataset
-        fields_to_keep = ['Contact', 'Department', 'Email', 'Hall Name', 'Name', 'Year']
-        
+        fields_to_keep = ["Contact", "Department", "Email", "Hall Name", "Name", "Year"]
+
         # Filter columns to only what's needed
         available_fields = [col for col in fields_to_keep if col in df.columns]
         df = df[available_fields]
 
         # Convert all columns to string to avoid serialization issues with JSON/Streamlit
         for col in df.columns:
-            df[col] = df[col].astype(str).replace('nan', 'N/A')
-        
+            df[col] = df[col].astype(str).replace("nan", "N/A")
+
         # Convert to list of dictionaries
-        return df.to_dict('records')
+        return df.to_dict("records")
 
     except Exception as e:
         st.error(f"An error occurred while loading the Excel file: {e}")
         return None
 
+
 def load_contact_status():
     """Load contact status from the JSON file into the session state."""
-    if 'contact_status' not in st.session_state:
+    if "contact_status" not in st.session_state:
         try:
             if os.path.exists(STATUS_FILE):
-                with open(STATUS_FILE, 'r', encoding='utf-8') as f:
+                with open(STATUS_FILE, "r", encoding="utf-8") as f:
                     st.session_state.contact_status = json.load(f)
             else:
                 st.session_state.contact_status = {}
@@ -60,13 +66,15 @@ def load_contact_status():
             st.warning(f"Could not load contact status file: {e}")
             st.session_state.contact_status = {}
 
+
 def save_contact_status():
     """Save the current contact status from the session state to the JSON file."""
     try:
-        with open(STATUS_FILE, 'w', encoding='utf-8') as f:
+        with open(STATUS_FILE, "w", encoding="utf-8") as f:
             json.dump(st.session_state.contact_status, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"Failed to save contact status: {e}")
+
 
 # --- Streamlit App UI ---
 
@@ -74,7 +82,8 @@ def save_contact_status():
 st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 
 # Custom CSS to enforce a clean, white-based theme
-st.markdown("""
+st.markdown(
+    """
 <style>
     /* Force white background on the main app container */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
@@ -121,51 +130,55 @@ st.markdown("""
     }
     
     /* Center and style checkboxes */
-    [data-testid="stCheckbox"] {
+    /* Checkbox override */
+    div[data-testid="stCheckbox"] > label > div:first-child {
+        background-color: #FFFFFF !important;
+        border: 1px solid #000000 !important;
+        width: 20px !important;
+        height: 20px !important;
+        border-radius: 4px !important;
+    }
+
+    div[data-testid="stCheckbox"] > label > div:first-child input {
+        display: none; /* hide native input */
+    }
+
+    div[data-testid="stCheckbox"] > label > div:first-child::after {
+        content: '' !important;
+    }
+
+    div[data-testid="stCheckbox"] > label > div:first-child.checked {
+        background-color: #000000 !important;
+        border-color: #000000 !important;
+    }
+
+    div[data-testid="stCheckbox"] > label > div:first-child.checked::after {
+        content: '✔' !important;
+        color: #FFFFFF !important;
+        font-size: 14px;
         display: flex;
-        justify-content: center;
         align-items: center;
-        height: 100%;
-        margin-top: -10px; /* Adjust vertical alignment */
+        justify-content: center;
     }
-    [data-testid="stCheckbox"] input {
-        -webkit-appearance: none;
-        appearance: none;
-        background-color: #FFFFFF; !important;
-        border: 1px solid #D0D0D0; !important;
-        width: 20px;
-        height: 20px;
-        border-radius: 4px;
-        position: relative;
-        cursor: pointer;
-    }
-    [data-testid="stCheckbox"] input:checked {
-        background-color: #E0E0E0;
-        border-color: #000000;
-    }
-    [data-testid="stCheckbox"] input:checked::after {
-        content: '✔';
-        font-size: 16px;
-        color: #000000;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-    }
+
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 st.title("Girls' Hall Contact Manager")
-st.markdown("Search, view, and update contact information for the Girls' Hall directory.")
+st.markdown(
+    "Search, view, and update contact information for the Girls' Hall directory."
+)
 
 # Initialize session state variables
-if 'hall_data' not in st.session_state:
+if "hall_data" not in st.session_state:
     st.session_state.hall_data = load_excel_data()
     load_contact_status()
-if 'page_number' not in st.session_state:
+if "page_number" not in st.session_state:
     st.session_state.page_number = 0
-if 'search_query' not in st.session_state:
+if "search_query" not in st.session_state:
     st.session_state.search_query = ""
 
 # Main app logic starts here
@@ -178,36 +191,39 @@ if st.session_state.hall_data:
             value=st.session_state.search_query,
             placeholder="Search by name, department, hall, etc.",
             key="search_box",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
     with search_col2:
         search_button = st.button("Search", use_container_width=True)
-    
+
     # Check for search changes from button or Enter key
     if search_button or (search_input != st.session_state.search_query):
         st.session_state.search_query = search_input
-        st.session_state.page_number = 0 # Reset page number on new search
+        st.session_state.page_number = 0  # Reset page number on new search
         st.toast("Applying search...")
-        time.sleep(0.5) # Give user time to see the toast
+        time.sleep(0.5)  # Give user time to see the toast
         st.rerun()
 
     # --- Data Filtering Logic ---
     filtered_data = st.session_state.hall_data
-    
+
     # Filter by search query
     if st.session_state.search_query:
         query = st.session_state.search_query.strip().lower()
         filtered_data = [
-            record for record in filtered_data
+            record
+            for record in filtered_data
             if any(query in str(value).lower() for value in record.values())
         ]
 
     # --- Pagination Logic ---
     total_records = len(filtered_data)
-    total_pages = (total_records // RECORDS_PER_PAGE) + (1 if total_records % RECORDS_PER_PAGE > 0 else 0)
+    total_pages = (total_records // RECORDS_PER_PAGE) + (
+        1 if total_records % RECORDS_PER_PAGE > 0 else 0
+    )
     start_idx = st.session_state.page_number * RECORDS_PER_PAGE
     end_idx = min(start_idx + RECORDS_PER_PAGE, total_records)
-    
+
     paginated_data = filtered_data[start_idx:end_idx]
 
     # --- Display Results ---
@@ -218,7 +234,7 @@ if st.session_state.hall_data:
     else:
         # Create fixed header columns
         cols = st.columns([2, 2, 2, 1])
-        headers = ['Name', 'Department / Hall', 'Contact Info', 'Contacted']
+        headers = ["Name", "Department / Hall", "Contact Info", "Contacted"]
         for col, header in zip(cols, headers):
             col.markdown(f"**{header}**")
         st.markdown("---")
@@ -228,17 +244,17 @@ if st.session_state.hall_data:
             # Display each record
             for i, record in enumerate(paginated_data, start=start_idx):
                 record_id = get_record_id(record)
-                
+
                 col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
 
                 with col1:
                     st.markdown(f"**{record.get('Name', 'N/A')}**")
                     st.caption(f"Year: {record.get('Year', 'N/A')}")
-                
+
                 with col2:
                     st.markdown(f"**{record.get('Department', 'N/A')}**")
                     st.caption(f"Hall: {record.get('Hall Name', 'N/A')}")
-                
+
                 with col3:
                     st.markdown(f"**Email:** {record.get('Email', 'N/A')}")
                     st.caption(f"Phone: {record.get('Contact', 'N/A')}")
@@ -246,34 +262,52 @@ if st.session_state.hall_data:
                 with col4:
                     is_contacted = st.session_state.contact_status.get(record_id, False)
                     unique_key = f"checkbox_{record_id}_{i}"
-                    new_status = st.checkbox(" ", value=is_contacted, key=unique_key, label_visibility="collapsed")
-                    
+                    new_status = st.checkbox(
+                        " ",
+                        value=is_contacted,
+                        key=unique_key,
+                        label_visibility="collapsed",
+                    )
+
                     if new_status != is_contacted:
                         st.session_state.contact_status[record_id] = new_status
                         save_contact_status()
                         st.rerun()
-                
+
                 st.markdown("---")
 
     # --- Pagination Controls ---
     if total_pages > 1:
         st.markdown("---")
-        
+
         # Use columns to center the pagination controls
         _, prev_col, page_col, next_col, _ = st.columns([3, 2, 2, 2, 3])
 
         with prev_col:
-            if st.button("⬅️ Previous", use_container_width=True, disabled=(st.session_state.page_number == 0)):
+            if st.button(
+                "⬅️ Previous",
+                use_container_width=True,
+                disabled=(st.session_state.page_number == 0),
+            ):
                 st.session_state.page_number -= 1
                 st.rerun()
-        
+
         with page_col:
-            st.markdown(f"<div style='text-align: center; margin-top: 5px;'>Page {st.session_state.page_number + 1} of {total_pages}</div>", unsafe_allow_html=True)
-            
+            st.markdown(
+                f"<div style='text-align: center; margin-top: 5px;'>Page {st.session_state.page_number + 1} of {total_pages}</div>",
+                unsafe_allow_html=True,
+            )
+
         with next_col:
-            if st.button("Next ➡️", use_container_width=True, disabled=(st.session_state.page_number >= total_pages - 1)):
+            if st.button(
+                "Next ➡️",
+                use_container_width=True,
+                disabled=(st.session_state.page_number >= total_pages - 1),
+            ):
                 st.session_state.page_number += 1
                 st.rerun()
 
 else:
-    st.info("Waiting for data to be loaded. If this message persists, please check the application logs.")
+    st.info(
+        "Waiting for data to be loaded. If this message persists, please check the application logs."
+    )
