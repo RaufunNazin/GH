@@ -73,20 +73,41 @@ def save_contact_status():
 # Set page configuration for a better layout
 st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
 
-# Custom CSS for a white-based theme
+# Custom CSS to enforce a clean, white-based theme
 st.markdown("""
 <style>
-    .main {
-        background-color: #FFFFFF;
-    }
-    body, .stApp {
+    /* Main app background */
+    .main, .stApp {
+        background-color: #FFFFFF !important;
         color: #000000;
     }
-    h1, h2, h3, h4, h5, h6 {
+
+    /* All text elements */
+    body, h1, h2, h3, h4, h5, h6, p, .stMarkdown, .st-emotion-cache-16txtl3 {
         color: #000000 !important;
     }
-    .st-emotion-cache-16txtl3 {
+    
+    /* Input fields */
+    .stTextInput input {
+        background-color: #F0F2F6 !important;
+        color: #000000 !important;
+    }
+    
+    /* Buttons */
+    .stButton>button {
+        background-color: #F0F2F6;
         color: #000000;
+        border: 1px solid #D0D0D0;
+    }
+    .stButton>button:hover {
+        background-color: #E0E0E0;
+        color: #000000;
+        border: 1px solid #C0C0C0;
+    }
+
+    /* Separator lines */
+    hr {
+        background-color: #E0E0E0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
