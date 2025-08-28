@@ -107,7 +107,7 @@ if st.session_state.hall_data:
             col.markdown(f"**{header}**")
 
         # Display each record in its own row
-        for record in filtered_data:
+        for i, record in enumerate(filtered_data):
             record_id = get_record_id(record)
             
             col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
@@ -128,8 +128,9 @@ if st.session_state.hall_data:
                 # Get the current status from session state
                 is_contacted = st.session_state.contact_status.get(record_id, False)
                 
-                # Create a checkbox that reflects the current status
-                new_status = st.checkbox(" ", value=is_contacted, key=record_id, label_visibility="collapsed")
+                # Create a checkbox with a guaranteed unique key by including the index
+                unique_key = f"checkbox_{record_id}_{i}"
+                new_status = st.checkbox(" ", value=is_contacted, key=unique_key, label_visibility="collapsed")
                 
                 # If the checkbox state is changed by the user, update the session state and save
                 if new_status != is_contacted:
