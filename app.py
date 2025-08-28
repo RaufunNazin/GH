@@ -1,164 +1,142 @@
-from flask import Flask, jsonify, request, render_template
-from flask_cors import CORS
+import streamlit as st
 import pandas as pd
 import json
 import os
 
-app = Flask(__name__)
-CORS(app)
+# --- Configuration ---
+EXCEL_FILE = "Emails Latest (1).xlsx"
+STATUS_FILE = 'contact_status.json'
 
-# Global variable to store the data
-hall_data = None
-contact_status = {}  # Dictionary to track contact status
-
-def load_excel_data():
-    """Load data from Excel file and convert to JSON format"""
-    global hall_data
-    try:
-        excel_file = "Emails Latest (1).xlsx"
-        if os.path.exists(excel_file):
-            # Read Excel file
-            df = pd.read_excel(excel_file)
-            
-            # Define the fields to keep
-            fields_to_keep = [
-                'Contact', 'Department', 'Email', 'Hall Name', 'Name', 'Year'
-            ]
-            
-            # Filter columns to only keep the specified fields
-            available_fields = [col for col in fields_to_keep if col in df.columns]
-            if available_fields:
-                df = df[available_fields]
-                print(f"Filtered to keep only these fields: {available_fields}")
-            else:
-                print("Warning: None of the specified fields found in the Excel file")
-                print(f"Available columns: {list(df.columns)}")
-            
-            # Convert all datetime/timestamp columns to strings
-            for col in df.columns:
-                if df[col].dtype == 'datetime64[ns]' or 'datetime' in str(df[col].dtype):
-                    df[col] = df[col].astype(str)
-                # Also handle any other non-serializable types
-                df[col] = df[col].apply(lambda x: str(x) if pd.isna(x) == False else None)
-            
-            # Convert to list of dictionaries
-            hall_data = df.to_dict('records')
-            
-            # Save as JSON for easier access
-            with open('hall_data.json', 'w', encoding='utf-8') as f:
-                json.dump(hall_data, f, ensure_ascii=False, indent=2)
-            
-            # Load existing contact status if available
-            load_contact_status()
-            
-            print(f"Loaded {len(hall_data)} records from Excel file")
-            return True
-        else:
-            print(f"Excel file '{excel_file}' not found")
-            return False
-    except Exception as e:
-        print(f"Error loading Excel file: {str(e)}")
-        return False
-
-def load_contact_status():
-    """Load contact status from file"""
-    global contact_status
-    try:
-        if os.path.exists('contact_status.json'):
-            with open('contact_status.json', 'r', encoding='utf-8') as f:
-                contact_status = json.load(f)
-            print(f"Loaded contact status for {len(contact_status)} records")
-        else:
-            contact_status = {}
-    except Exception as e:
-        print(f"Error loading contact status: {str(e)}")
-        contact_status = {}
-
-def save_contact_status():
-    """Save contact status to file"""
-    try:
-        with open('contact_status.json', 'w', encoding='utf-8') as f:
-            json.dump(contact_status, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"Error saving contact status: {str(e)}")
+# --- Helper Functions ---
 
 def get_record_id(record):
-    """Generate a unique ID for a record based on key fields"""
-    return f"{record.get('Name', '')}_{record.get('Contact', '')}_{record.get('Email', '')}"
+    """Generate a unique ID for a record based on key fields to prevent collisions."""
+    # Using a tuple of sorted items makes the ID independent of column order
+    key_items = sorted([str(v) for k, v in record.items() if k in ['Name', 'Contact', 'Email']])
+    return "_".join(key_items)
 
-@app.route('/')
-def index():
-    """Serve the main page"""
-    return render_template('index.html')
+# --- Data Loading and Caching ---
 
-@app.route('/api/data')
-def get_data():
-    """Get all hall data"""
-    if hall_data is None:
-        return jsonify({'error': 'Data not loaded'}), 500
-    return jsonify(hall_data)
-
-@app.route('/api/search')
-def search_data():
-    """Search hall data by hall name or department name"""
-    if hall_data is None:
-        return jsonify({'error': 'Data not loaded'}), 500
-    
-    query = request.args.get('q', '').strip().lower()
-    if not query:
-        return jsonify(hall_data)
-    
-    # Search in all string fields (case-insensitive)
-    results = []
-    for record in hall_data:
-        for key, value in record.items():
-            if isinstance(value, str) and query in str(value).lower():
-                results.append(record)
-                break
-    
-    return jsonify(results)
-
-@app.route('/api/columns')
-def get_columns():
-    """Get column names from the data"""
-    if hall_data is None or len(hall_data) == 0:
-        return jsonify({'error': 'Data not loaded'}), 500
-    
-    columns = list(hall_data[0].keys())
-    return jsonify(columns)
-
-@app.route('/api/contact-status', methods=['POST'])
-def update_contact_status():
-    """Update contact status for a record"""
+@st.cache_data
+def load_excel_data():
+    """Load data from Excel file, clean it, and return as a list of dictionaries."""
     try:
-        data = request.get_json()
-        record_id = data.get('record_id')
-        status = data.get('status')  # 'contacted' or 'not_contacted'
+        if not os.path.exists(EXCEL_FILE):
+            st.error(f"Error: The data file '{EXCEL_FILE}' was not found.")
+            return None
+
+        df = pd.read_excel(EXCEL_FILE)
         
-        if not record_id or status not in ['contacted', 'not_contacted']:
-            return jsonify({'error': 'Invalid data'}), 400
+        # Define the fields to keep for a clean dataset
+        fields_to_keep = ['Contact', 'Department', 'Email', 'Hall Name', 'Name', 'Year']
         
-        contact_status[record_id] = status
-        save_contact_status()
+        # Filter columns to only what's needed
+        available_fields = [col for col in fields_to_keep if col in df.columns]
+        df = df[available_fields]
+
+        # Convert all columns to string to avoid serialization issues with JSON/Streamlit
+        for col in df.columns:
+            df[col] = df[col].astype(str).replace('nan', 'N/A')
         
-        return jsonify({'success': True, 'status': status})
+        # Convert to list of dictionaries
+        return df.to_dict('records')
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        st.error(f"An error occurred while loading the Excel file: {e}")
+        return None
 
-@app.route('/api/contact-status/<record_id>')
-def get_contact_status(record_id):
-    """Get contact status for a specific record"""
-    status = contact_status.get(record_id, 'not_contacted')
-    return jsonify({'status': status})
+def load_contact_status():
+    """Load contact status from the JSON file into the session state."""
+    if 'contact_status' not in st.session_state:
+        try:
+            if os.path.exists(STATUS_FILE):
+                with open(STATUS_FILE, 'r', encoding='utf-8') as f:
+                    st.session_state.contact_status = json.load(f)
+            else:
+                st.session_state.contact_status = {}
+        except Exception as e:
+            st.warning(f"Could not load contact status file: {e}")
+            st.session_state.contact_status = {}
 
-if __name__ == '__main__':
-    # Load data on startup
-    if load_excel_data():
-        print("Data loaded successfully!")
+def save_contact_status():
+    """Save the current contact status from the session state to the JSON file."""
+    try:
+        with open(STATUS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.contact_status, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.error(f"Failed to save contact status: {e}")
+
+# --- Streamlit App UI ---
+
+# Set page configuration for a better layout
+st.set_page_config(page_title="Girls' Hall Contact List", layout="wide")
+
+st.title("Girls' Hall Contact Directory")
+st.markdown("A simple app to search and manage contacts.")
+
+# Load data into session state once to persist across reruns
+if 'hall_data' not in st.session_state:
+    st.session_state.hall_data = load_excel_data()
+    load_contact_status()
+
+# Main app logic starts here
+if st.session_state.hall_data:
+    # Create a search bar
+    search_query = st.text_input("Search by any field (Name, Department, Hall, etc.)", placeholder="Type here to search...")
+
+    # Filter data based on the search query
+    if search_query:
+        query = search_query.strip().lower()
+        filtered_data = [
+            record for record in st.session_state.hall_data
+            if any(query in str(value).lower() for value in record.values())
+        ]
     else:
-        print("Failed to load data!")
-    
-    # Use environment variable for port (required for deployment platforms)
-    port = int(os.environ.get('PORT', 5001))
-    debug_mode = os.environ.get('FLASK_ENV') != 'production'
-    app.run(debug=debug_mode, host='0.0.0.0', port=port)
+        filtered_data = st.session_state.hall_data
+
+    # Display the count of results
+    st.write(f"Displaying {len(filtered_data)} of {len(st.session_state.hall_data)} records.")
+
+    if not filtered_data:
+        st.warning("No records found matching your search criteria.")
+    else:
+        # Create header columns for a clean layout
+        cols = st.columns([2, 2, 2, 1]) # Adjust column widths as needed
+        headers = ['Name', 'Department / Hall', 'Contact Info', 'Contacted']
+        for col, header in zip(cols, headers):
+            col.markdown(f"**{header}**")
+
+        # Display each record in its own row
+        for record in filtered_data:
+            record_id = get_record_id(record)
+            
+            col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+
+            with col1:
+                st.markdown(f"**{record.get('Name', 'N/A')}**")
+                st.caption(f"Year: {record.get('Year', 'N/A')}")
+            
+            with col2:
+                st.markdown(f"**{record.get('Department', 'N/A')}**")
+                st.caption(f"Hall: {record.get('Hall Name', 'N/A')}")
+            
+            with col3:
+                st.markdown(f"**Email:** {record.get('Email', 'N/A')}")
+                st.caption(f"Phone: {record.get('Contact', 'N/A')}")
+
+            with col4:
+                # Get the current status from session state
+                is_contacted = st.session_state.contact_status.get(record_id, False)
+                
+                # Create a checkbox that reflects the current status
+                new_status = st.checkbox(" ", value=is_contacted, key=record_id, label_visibility="collapsed")
+                
+                # If the checkbox state is changed by the user, update the session state and save
+                if new_status != is_contacted:
+                    st.session_state.contact_status[record_id] = new_status
+                    save_contact_status()
+                    st.rerun() # Rerun the script to immediately reflect the change
+            
+            st.markdown("---") # Add a visual separator between records
+else:
+    st.info("Waiting for data to be loaded. If this message persists, please check the application logs.")
