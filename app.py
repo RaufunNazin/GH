@@ -93,6 +93,12 @@ st.markdown("""
         border: 1px solid #D0D0D0 !important;
     }
     
+    /* Style placeholder text for the light theme */
+    .stTextInput input::placeholder {
+        color: #000000 !important;
+        opacity: 0.7 !important;
+    }
+    
     /* Style buttons for the light theme */
     .stButton>button {
         background-color: #F0F2F6;
@@ -119,6 +125,7 @@ st.markdown("""
     }
     [data-testid="stCheckbox"] input {
         transform: scale(1.5);
+        accent-color: #000000; /* Make the checkmark black */
     }
 </style>
 """, unsafe_allow_html=True)
